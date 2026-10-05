@@ -5,120 +5,19 @@ use winit::dpi::LogicalSize;
 use winit::event_loop::{ActiveEventLoop, EventLoop};
 use winit::window::Window;
 
-#[derive(Parser, Clone, Debug)]
-#[command(version, about, long_about = None)]
-struct Args {
-    #[arg(long)]
-    program: String, // program file path
+use crate::nibble_codes::NibbleCode;
+use crate::instructions::clear_screen;
+use crate::memory::Memory;
 
-    #[arg(long, default_value_t=4096)]
-    memory_size: u16, // total memory capacity
-
-    #[arg(long, default_value_t=64)]
-    screen_size_x: u8, // horizontal screen size
-    #[arg(long, default_value_t=32)]
-    screen_size_y: u8, // vertical screen size
-
-    // #[arg(short, long, default_value_t=1)]
-    // clock_speed_mhz: u8
-    #[arg(long, default_value_t=700)]
-    instructions_per_second: u32 // instructions per second
+struct DecodeData {
+    immediate_mem_address: u16,
+    operation: u16,
+    first_byte: u16,
+    second_byte: u16,
+    register_x: u8,
+    register_y: u8,
+    constant: u16,
 }
-
-#[derive(Debug)]
-struct Display {
-    size_x: u8,
-    size_y: u8,
-    buffer: Vec<u8>
-    // read_window: Window
-}
-
-impl Display {
-    fn new(x: u8, y: u8) -> Self {
-        // let win_attrs = Window::default_attributes()
-        //     .with_title("Test")
-        //     .with_inner_size(LogicalSize::new(x as f64, y as f64));
-        Self {
-            size_x: x,
-            size_y: y,
-            buffer: vec![0; x as usize * y as usize]
-            // read_window: ActiveEventLoop::create_window(event_loop, win_attrs).unwrap()
-        }
-    }
-
-    fn read_buffer(&self, x: u8, y: u8) -> u8 {
-        self.buffer[y as usize * self.size_x as usize + x as usize]
-    }
-
-    // write a value to the display buffer
-    fn write_buffer(&mut self, x: u8, y: u8, value: u8) {
-        self.buffer[y as usize * self.size_x as usize + x as usize] = value;
-    }
-
-    // original interpeters updated the display at 60fps, but we can get away with only redrawing the screen when the buffer is updated.
-    fn update_display(&mut self) {
-        // write the buffer to the display window
-        // for y in 0..self.size_y {
-        //     for x in 0..self.size_x {
-        //         // chip8 is monochromatic
-        //         let pixel = if self.read_buffer(x, y) == 0 { 0x000000 } else { 0xFFFFFF };
-        //         self.read_window.set_pixel(x as usize, y as usize, pixel);
-        //     }
-        // }
-    }
-}
-
-#[derive(Debug, Clone)]
-struct Memory {
-    data: Vec<u8> // memory block
-}
-
-impl Memory {
-    fn new(size: u16) -> Self {
-        Self {
-            data: vec![0; size as usize]
-        }
-    }
-
-    fn read(&self, address: u16) -> u8 {
-        self.data[address as usize]
-    }
-
-    fn write(&mut self, address: u16, value: u8) {
-        self.data[address as usize] = value;
-    }
-}
-
-#[derive(Debug, Clone)]
-struct Chip8Components {
-    // timers and frequencies
-    delay_timer: u8, // delay timer, 
-    delay_timer_freq: u8, // delay timer frequency
-    sound_timer: u8, // sound timer, beeps if not zero
-    sound_timer_freq: u8, // sound timer frequency
-
-    // registers and stack
-    program_counter: u16, // pointer to the current instruction
-    index_register: u16, // pointer for pointing at locations in memory
-    stack: [u16; 16], //stack for calling and returning from subroutines
-    registers: [u8; 16], // registers, VF commonly used as flag register
-}
-
-impl Default for Chip8Components {
-    fn default() -> Self {
-        Self {
-            delay_timer: 0,
-            delay_timer_freq: 60,
-            sound_timer: 0,
-            sound_timer_freq: 60,
-            program_counter: 0,
-            index_register: 0,
-            stack: [0; 16],
-            registers: [0; 16]
-        }
-    }
-}
-
 
 fn fetch(components: &mut Chip8Components, memory: &Memory) -> u16 {
     // get the next instruction from memory
@@ -135,15 +34,57 @@ fn fetch(components: &mut Chip8Components, memory: &Memory) -> u16 {
     insn
 }   
 
-fn decode(bytes: u16) {
+fn decode(bytes: u16) -> DecodeData {
     println!("Got instruction {:x}", bytes);
-    match bytes {
-        _ => println!("Unknown instruction {:x}", bytes)
+    let first_byte = (bytes & 0xFF00) >> 8;
+    let second_byte = bytes & 0x00FF; // contains 3rd and 4th nibbles, can be used as an immediate number
+    let immediate_mem_address = bytes & 0x0FFF; // 2md, 3rd, 4th nibbles, may be used for a 12 bit memory address
+
+    // split up nibbles
+    let operation = (bytes & 0xF000) >> 12;
+    let register_x = (bytes & 0x0F00) >> 8;
+    let register_y = (bytes & 0x00F0) >> 4;
+    let constant = bytes & 0x000F;
+
+    DecodeData {
+        immediate_mem_address: immediate_mem_address,
+        operation: operation,
+        first_byte: first_byte,
+
     }
 }
 
-fn execute() {
+fn execute(data: &DecodeData) {
 
+    match operation {
+        NibbleCode::ClearScreen => {
+            
+        },
+        
+        NibbleCode::Jump => {
+            
+        },
+
+        NibbleCode::SetRegister => {
+            
+        }
+
+        NibbleCodes::AddToRegister => {
+            
+        },
+
+        NibbleCodes::SetIndexRegister => {
+            
+        },
+
+        NibbleCodes::Draw => {
+            
+        },
+        
+        _ => { 
+            println!("Unknown instruction {:x}", bytes)
+        }
+    }
 }
 
 // Initialize Chip8.
@@ -174,11 +115,8 @@ fn main_loop(components: &mut Chip8Components, memory: &mut Memory, display: &mu
             break;
         }
 
-        let instruction = decode(instruction_bytes);
-        // execute(instruction);
-
-        // update program counter
-        // components.program_counter += 2;
+        let instruction  = decode(instruction_bytes);
+        execute(&instruction);
     }
 }
 
@@ -201,5 +139,5 @@ fn main() {
 
     initialize(&mut components, &mut memory, &args);
     main_loop(&mut components, &mut memory, &mut display);
-    // finalize();
+    finalize();
 }
