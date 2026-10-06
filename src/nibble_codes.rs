@@ -1,4 +1,4 @@
-enum NibbleCode {
+pub enum NibbleCode {
     ClearScreen = 0x0,
     Jump = 0x1,
     SetRegister = 0x6,

@@ -4,18 +4,29 @@ use std::io;
 use winit::dpi::LogicalSize;
 use winit::event_loop::{ActiveEventLoop, EventLoop};
 use winit::window::Window;
+use std::time::{SystemTime, UNIX_EPOCH};
+
+mod nibble_codes;
+mod launch_arguments;
+mod memory;
+mod display;
+mod chip8_components;
+mod instructions;
 
 use crate::nibble_codes::NibbleCode;
 use crate::instructions::clear_screen;
 use crate::memory::Memory;
+use crate::chip8_components::Chip8Components;
+use crate::launch_arguments::Args;
+use crate::display::Display;
 
 struct DecodeData {
     immediate_mem_address: u16,
-    operation: u16,
+    opcode: u16,
     first_byte: u16,
     second_byte: u16,
-    register_x: u8,
-    register_y: u8,
+    register_x: u16,
+    register_y: u16,
     constant: u16,
 }
 
@@ -48,41 +59,45 @@ fn decode(bytes: u16) -> DecodeData {
 
     DecodeData {
         immediate_mem_address: immediate_mem_address,
-        operation: operation,
+        opcode: operation,
         first_byte: first_byte,
-
+        second_byte: second_byte,
+        register_x: register_x,
+        register_y: register_y,
+        constant: constant,
     }
 }
 
-fn execute(data: &DecodeData) {
+fn execute(data: &DecodeData, components: &mut Chip8Components, display: &mut Display) {
 
-    match operation {
-        NibbleCode::ClearScreen => {
-            
+    match data.opcode {
+        val if val == NibbleCode::ClearScreen as u16 => {
+            println!("Clear screen");
+            // instructions::clear_screen(display);
         },
         
-        NibbleCode::Jump => {
+        val if val == NibbleCode::Jump as u16 => {
             
         },
 
-        NibbleCode::SetRegister => {
+        val if val == NibbleCode::SetRegister as u16 => {
             
         }
 
-        NibbleCodes::AddToRegister => {
+        val if val == NibbleCode::AddToRegister as u16 => {
             
         },
 
-        NibbleCodes::SetIndexRegister => {
+        val if val == NibbleCode::SetIndexRegister as u16 => {
             
         },
 
-        NibbleCodes::Draw => {
+        val if val == NibbleCode::Draw as u16 => {
             
         },
         
         _ => { 
-            println!("Unknown instruction {:x}", bytes)
+            println!("Unknown opcode {:x}", data.opcode);
         }
     }
 }
@@ -107,16 +122,43 @@ fn initialize(components: &mut Chip8Components, memory: &mut Memory, args: &Args
 
 // Fetch/decode/execute loop
 fn main_loop(components: &mut Chip8Components, memory: &mut Memory, display: &mut Display) {
-    loop {
-        let instruction_bytes: u16 = fetch(components, memory);
+    let cycle_duration: f64 = 1.0 / 700.0; // chip8 has 700 hz clock
+    let update_rate: f64 = 1.0 / 60.0; // screen refresh rate;
+    let time = SystemTime::now().duration_since(UNIX_EPOCH).expect("Bad time");
+    let time_f64 = time.as_secs() as f64 + time.subsec_nanos() as f64;
+    let mut next_cycle: f64 = time_f64 + cycle_duration;
+    let mut next_screen_update: f64 = time_f64 + update_rate;
 
-        // temporary break if we hit an empty instruction
-        if instruction_bytes == 0 {
-            break;
+    loop {
+        // get current time
+        let current_time = SystemTime::now().duration_since(UNIX_EPOCH).expect("Bad time");
+        let current_time_f64 = current_time.as_secs() as f64 + current_time.subsec_nanos() as f64;
+
+        if current_time_f64 >= next_cycle {
+            println!("Next instruction");
+
+            let instruction_bytes: u16 = fetch(components, memory);
+
+            // temporary break if we hit an empty instruction
+            if instruction_bytes == 0 {
+                break;
+            }
+
+            let instruction  = decode(instruction_bytes);
+            execute(&instruction, components, display);
+
+            // update for next cycle
+            next_cycle = current_time_f64 + cycle_duration;
         }
 
-        let instruction  = decode(instruction_bytes);
-        execute(&instruction);
+        if current_time_f64 >= next_screen_update {
+            println!("Update screen");
+
+            // update the screen
+            // display.update();
+
+            next_screen_update = current_time_f64 + update_rate;
+        }
     }
 }
 

@@ -4,7 +4,7 @@ pub struct Memory {
 }
 
 impl Memory {
-    fn new(size: u16) -> Self {
+    pub fn new(size: u16) -> Self {
         Self {
             data: vec![0; size as usize]
         }
