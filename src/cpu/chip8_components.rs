@@ -1,16 +1,16 @@
 #[derive(Debug, Clone)]
 pub struct Chip8Components {
     // timers and frequencies
-    delay_timer: u8, // delay timer, 
-    delay_timer_freq: u8, // delay timer frequency
-    sound_timer: u8, // sound timer, beeps if not zero
-    sound_timer_freq: u8, // sound timer frequency
+    pub delay_timer: u8, // delay timer, 
+    pub delay_timer_freq: u8, // delay timer frequency
+    pub sound_timer: u8, // sound timer, beeps if not zero
+    pub sound_timer_freq: u8, // sound timer frequency
 
     // registers and stack
     pub program_counter: u16, // pointer to the current instruction
-    index_register: u16, // pointer for pointing at locations in memory
-    stack: [u16; 16], //stack for calling and returning from subroutines
-    registers: [u8; 16], // registers, VF commonly used as flag register
+    pub index_register: u16, // pointer for pointing at locations in memory
+    pub stack: [u8; 16], //stack for calling and returning from subroutines
+    pub registers: [u8; 16], // registers, VF commonly used as flag register
 }
 
 impl Default for Chip8Components {

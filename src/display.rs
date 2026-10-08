@@ -1,4 +1,4 @@
-use minifb::{Key, Window, WindowOptions};
+use minifb::{Window, WindowOptions, Scale, ScaleMode};
 
 #[derive(Debug)]
 pub struct Display {
@@ -15,10 +15,19 @@ impl Display {
             size_y: y,
             buffer: vec![0; x as usize * y as usize],
             window: Window::new(
-                "WIndow Test",
+                "Window Test",
                 x as usize,
                 y as usize,
-                WindowOptions::default(),
+                WindowOptions {
+                    borderless: false,
+                    title: true,
+                    resize: true,
+                    scale: Scale::X16,
+                    scale_mode: ScaleMode::AspectRatioStretch,
+                    topmost: false,
+                    transparency: false,
+                    none: false,
+                },
             ).unwrap_or_else(|e| {
                 panic!("{}", e)
             }),

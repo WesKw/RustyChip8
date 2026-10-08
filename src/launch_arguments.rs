@@ -16,6 +16,9 @@ pub struct Args {
 
     // #[arg(short, long, default_value_t=1)]
     // clock_speed_mhz: u8
-    #[arg(long, default_value_t=700)]
-    pub instructions_per_second: u32, // instructions per second
+    #[arg(long, default_value_t=11)]
+    pub instructions_per_frame: u32, // instructions to run perframe (default is 11 -> 60 * 11 = 660 instructions per second)
+
+    #[arg(long, default_value_t=60)]
+    pub frames_per_second: u32, // number of screen updates per second (default is 60)
 }
