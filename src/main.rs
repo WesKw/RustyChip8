@@ -1,33 +1,26 @@
 use clap::Parser;
 
+mod cpu;
+mod display;
 mod launch_arguments;
 mod memory;
-mod display;
-mod cpu;
+mod logger;
 
-use crate::cpu::{start};
-use crate::memory::Memory;
-use crate::cpu::chip8_components::Chip8Components;
+use crate::cpu::core;
 use crate::launch_arguments::Args;
-use crate::display::Display;
+use crate::logger::log_functions;
+use crate::logger::log_levels::LogLevel;
 
 // Main entry point
 fn main() {
     let args = Args::parse();
 
-    println!("Program file: {}", args.program);
-    println!("Using screen size {}x{}", args.screen_size_x, args.screen_size_y);
+    log_functions::set_log_level(LogLevel::try_from(args.log_level).unwrap());
+    log_functions::print_cli_args(&args);
 
-    let mut components = Chip8Components::default();
-    let mut memory = Memory::new(args.memory_size);
-    // let event_loop = ActiveEventLoop::new();
-    let mut display = Display::new(args.screen_size_x, args.screen_size_y);
+    // begin main loop
+    let rc = core::start(&args);
 
-    display.update(); // initialize the display
-
-    cpu::start();
-
-    initialize(&mut components, &mut memory, &args);
-    main_loop(&mut components, &mut memory, &mut display, &args);
-    finalize();
+    // print return code when exiting
+    log_functions::print_return_code(rc);
 }

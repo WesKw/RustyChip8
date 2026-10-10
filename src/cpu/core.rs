@@ -2,18 +2,16 @@
 
 use core::time;
 use std::fs;
-use std::io;
-use winit::dpi::LogicalSize;
-use winit::event_loop::{ActiveEventLoop, EventLoop};
-use winit::window::Window;
 use std::time::{SystemTime, UNIX_EPOCH, Instant};
 use std::thread::sleep;
 
-use crate::chip8_components::Chip8Components;
-use crate::memory::Memory;
 use crate::display::Display;
+use crate::cpu::chip8_components::Chip8Components;
+use crate::memory::Memory;
+use crate::launch_arguments::Args;
+use crate::cpu::opcodes::NibbleCode;
 
-struct DecodeData {
+pub struct DecodeData {
     immediate_mem_address: u16,
     opcode: u8,
     first_byte: u8,
@@ -25,37 +23,69 @@ struct DecodeData {
 
 // Clears the screen.
 pub fn clear_screen(display: &mut Display) {
-    println!("Clearing screen");
+    // println!("Clearing screen");
     display.clear_buffer();
 }
 
 // Sets the program counter to an address.
 pub fn jump(components: &mut Chip8Components, address: u16) {
-    println!("Jumping to {:x}", address);
+    // println!("Jumping to {:x}", address);
     components.program_counter = address;
 }
 
 // Set the register X to NN.
 pub fn set_register(components: &mut Chip8Components, register: u8, value: u8) {
-    println!("Setting V{:x} to {:x}", register, value);
+    // println!("Setting V{:x} to {:x}", register, value);
     components.registers[register as usize] = value;
 }
 
 // Add a value to register X. Does not set the carry flag if the result overflows.
 pub fn add_register(components: &mut Chip8Components, register: u8, value: u8) {
-    println!("Adding {:x} to V{:x}", value, register);
+    // println!("Adding {:x} to V{:x}", value, register);
     components.registers[register as usize] += value;
 }
 
 // Set the index register to an address.
 pub fn set_index_register(components: &mut Chip8Components, address: u16) {
-    println!("Set index register to {:x}", address);
+    // println!("Set index register to {:x}", address);
     components.index_register = address;
 }
 
-pub fn draw(display: &mut Display, x: u8, y: u8, value: u8) {
-    println!("Writing to display buffer");
-    display.write_buffer(x as u32, y as u32, value as u32);
+// draw a sprite at x and y location from the memory location that the index register
+// points to.
+pub fn draw(components: &mut Chip8Components, display: &mut Display, x: u8, y: u8, rows: u8) {
+    // get x and y coordinates
+    let mut x_loc: u8 = components.registers[x as usize];
+    let mut y_loc: u8 = components.registers[y as usize];
+
+    // set the x and y coordinates using modulo with the screen size
+    x_loc = x_loc & 63;
+    y_loc = y_loc & 31;
+
+    // set register F to 0 (flag register)
+    components.registers[0xF as usize] = 0;
+
+    // for n rows (height of the sprite in bytes)
+    for row in 0..rows {
+        // get nth byte of sprite data starting from index register
+
+        // for each of the 8 bits in the this sprite row
+        for ... {
+            // if current pixel in row is on and pixel at x,y is on, turn off pixel, set register F to 1
+
+            // or if the pixel in the spirte row and the screen pixel isn't draw pixel at x,y
+
+            // if the edge of the screen is reached, stop drawing the row
+
+            // incrememnt X (not VX)
+            x_loc += 1;
+        }
+
+        // increment Y
+        y_loc += 1;
+    }
+
+    // display.write_buffer(x_loc as u32, y_loc as u32, value as u32);
 }
 
 
@@ -67,7 +97,7 @@ fn fetch(components: &mut Chip8Components, memory: &Memory) -> u16 {
 
     // get the next instruction from memory
     // instruction is 2 bytes
-    println!("Reading instruction at PC: {:x}", components.program_counter);
+    // println!("Reading instruction at PC: {:x}", components.program_counter);
     let byte1: u16 = (memory.read(components.program_counter) as u16) << 8; // shift over one byte
     let byte2: u16 = memory.read(components.program_counter + 1) as u16;
     let insn: u16 = byte1 | byte2;
@@ -80,7 +110,7 @@ fn fetch(components: &mut Chip8Components, memory: &Memory) -> u16 {
 }   
 
 fn decode(bytes: u16) -> DecodeData {
-    println!("Got instruction {:x}", bytes);
+    // println!("Got instruction {:x}", bytes);
     let first_byte: u8 = ((bytes & 0xFF00) >> 8).try_into().unwrap();
     let second_byte: u8 = ((bytes & 0x00FF) as u8).try_into().unwrap(); // contains 3rd and 4th nibbles, can be used as an immediate number
     let immediate_mem_address = bytes & 0x0FFF; // 2md, 3rd, 4th nibbles, may be used for a 12 bit memory address
@@ -126,7 +156,7 @@ fn execute(data: &DecodeData, components: &mut Chip8Components, display: &mut Di
         },
 
         val if val == NibbleCode::Draw as u8 => {
-            draw(display, data.register_x as u8, data.register_y, data.constant);
+            draw(components, display, data.register_x, data.register_y, data.constant);
         },
         
         _ => { 
@@ -155,18 +185,15 @@ fn frame_update_step(components: &mut Chip8Components, display: &mut Display) {
     display.update();
 }
 
-pub fn start() {
-    
-}
-
 // Initialize the CPU.
-pub fn initialize(components: &mut Chip8Components, memory: &mut Memory, args: &Args) {
+pub fn initialize(components: &mut Chip8Components, memory: &mut Memory, display: &mut Display, args: &Args) -> i32 {
     // load default components of Chip8
     println!("Initializing Chip8");
 
     // load program into memory
     let prog: Vec<u8> = fs::read(&args.program).expect("Failed to read program file");
     let start: u16 = 0x200; // typical start address for Chip8 programs
+    println!("start {}", start);
     for (i, &byte) in prog.iter().enumerate() {
         memory.write(start + i as u16, byte);
     }
@@ -175,27 +202,25 @@ pub fn initialize(components: &mut Chip8Components, memory: &mut Memory, args: &
     components.program_counter = start;
 
     // generate window
+    display.update(); // initialize the display
+
+    0
 }
 
 // shutdown Chip8
-pub fn finalize() {
+pub fn finalize() -> i32 {
     println!("Shutdown");
+    0
 }
 
 // Fetch/decode/execute loop
-pub fn main_loop(components: &mut Chip8Components, memory: &mut Memory, display: &mut Display, args: &Args) {
-    let update_rate: f64 = 1.0 / args.frames_per_second as f64; // screen refresh rate;
-    // let mut cpu_clock = Instant::now().elapsed().as_secs_f64();
-    // println!("{}", cpu_clock);
-    // let mut next_cycle: f64 = cpu_clock + cycle_duration;
-    // let mut next_screen_update: f64 = time_seconds + update_rate;
-    // println!("{}", next_cycle);
-    // println!("{}", next_screen_update);
+pub fn main_loop(components: &mut Chip8Components, memory: &mut Memory, display: &mut Display, fps: u32, ips: u32) -> i32 {
+    let update_rate: f64 = 1.0 / fps as f64; // screen refresh rate;
 
     loop {
         let start = Instant::now();
         // run n instructions per frame
-        for _i in 1..=args.instructions_per_frame {
+        for _i in 1..=ips {
             input_step(components, memory);
             cpu_step(components, memory, display);
         }
@@ -204,8 +229,28 @@ pub fn main_loop(components: &mut Chip8Components, memory: &mut Memory, display:
 
         // then wait until we need to perform the next update
         let elapsed = Instant::now() - start;
-        sleep(time::Duration::from_secs_f64(update_rate) - elapsed);
+        let sleep_time = time::Duration::from_secs_f64(update_rate) - elapsed;
+        sleep(sleep_time);
+        // println!("Slept for {:?}", sleep_time);
     }
+
+    0
 }
 
-// pub fn 
+
+pub fn start(args: &Args) -> i32 {
+    let mut components = Chip8Components::default();
+    let mut memory = Memory::new(args.memory_size);
+    memory.setup_font_data();
+    // let event_loop = ActiveEventLoop::new();
+    let mut display = Display::new(args.screen_size_x, args.screen_size_y);
+    
+    let mut rc = initialize(&mut components, &mut memory, &mut display, &args);
+    if rc != 0 { return rc; }
+
+    rc = main_loop(&mut components, &mut memory, &mut display, args.frames_per_second, args.instructions_per_frame);
+    if rc != 0 { return rc; }
+
+    rc = finalize();
+    rc
+}

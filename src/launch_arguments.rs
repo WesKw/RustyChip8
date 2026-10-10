@@ -21,4 +21,7 @@ pub struct Args {
 
     #[arg(long, default_value_t=60)]
     pub frames_per_second: u32, // number of screen updates per second (default is 60)
+
+    #[arg(long, default_value_t=0)]
+    pub log_level: i32,
 }
