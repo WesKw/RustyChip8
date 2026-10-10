@@ -46,10 +46,18 @@ impl Memory {
     }
 
     pub fn read(&self, address: u16) -> u8 {
+        if address as usize >= self.data.len() {
+            panic!("Invalid memory access for read: 0x{:x}", address);
+        }
+
         self.data[address as usize]
     }
 
     pub fn write(&mut self, address: u16, value: u8) {
+        if address as usize >= self.data.len() {
+            panic!("Invalid memory access for write: 0x{:x}", address);
+        }
+        
         self.data[address as usize] = value
     }
 }
