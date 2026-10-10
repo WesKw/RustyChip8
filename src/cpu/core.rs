@@ -53,14 +53,10 @@ pub fn set_index_register(components: &mut Chip8Components, address: u16) {
 
 // draw a sprite at x and y location from the memory location that the index register
 // points to.
-pub fn draw(components: &mut Chip8Components, display: &mut Display, x: u8, y: u8, rows: u8) {
+pub fn draw(components: &mut Chip8Components, memory: &mut Memory, display: &mut Display, x: u8, y: u8, rows: u8) {
     // get x and y coordinates
-    let mut x_loc: u8 = components.registers[x as usize];
-    let mut y_loc: u8 = components.registers[y as usize];
-
-    // set the x and y coordinates using modulo with the screen size
-    x_loc = x_loc & 63;
-    y_loc = y_loc & 31;
+    let x_loc: u8 = components.registers[x as usize];
+    let y_loc: u8 = components.registers[y as usize];
 
     // set register F to 0 (flag register)
     components.registers[0xF as usize] = 0;
@@ -68,21 +64,30 @@ pub fn draw(components: &mut Chip8Components, display: &mut Display, x: u8, y: u
     // for n rows (height of the sprite in bytes)
     for row in 0..rows {
         // get nth byte of sprite data starting from index register
+        let sprite_byte: u8 = memory.read(components.index_register + row as u16);
 
         // for each of the 8 bits in the this sprite row
-        for ... {
-            // if current pixel in row is on and pixel at x,y is on, turn off pixel, set register F to 1
+        for col in 0..8 {
+            // not entirely sure what this is doing (we're checking each bit of the sprite byte)
+            if (sprite_byte & (0x80 >> col)) != 0 {
+                // set the x and y coordinates using modulo with the screen size
+                let target_x_loc = (x_loc + col) % 64;
+                let target_y_loc = (y_loc + row) % 32;
+                let result = display.read_buffer(target_x_loc as u32, target_y_loc as u32) ^ true;
 
-            // or if the pixel in the spirte row and the screen pixel isn't draw pixel at x,y
+                // if current pixel in row is on and pixel at x,y is on, turn off pixel, set register F to 1
+                if result == true {
+                    components.registers[0xF as usize] = 1;
+                }
 
-            // if the edge of the screen is reached, stop drawing the row
+                display.write_buffer(target_x_loc as u32, target_y_loc as u32, result);
+            }
 
             // incrememnt X (not VX)
-            x_loc += 1;
+            // x_loc += 1;
         }
-
         // increment Y
-        y_loc += 1;
+        // y_loc += 1;
     }
 
     // display.write_buffer(x_loc as u32, y_loc as u32, value as u32);
@@ -132,11 +137,17 @@ fn decode(bytes: u16) -> DecodeData {
     }
 }
 
-fn execute(data: &DecodeData, components: &mut Chip8Components, display: &mut Display) {
+fn execute(data: &DecodeData, components: &mut Chip8Components, memory: &mut Memory, display: &mut Display) {
 
     match data.opcode {
-        val if val == NibbleCode::ClearScreen as u8 => {
-            clear_screen(display);
+        val if val == NibbleCode::Misc as u8 => {
+            if data.second_byte == 0xE0 {
+                clear_screen(display);
+            }
+
+            if data.second_byte == 0xEE {
+                panic!("Subroutines not implemented");
+            }
         },
         
         val if val == NibbleCode::Jump as u8 => {
@@ -156,11 +167,11 @@ fn execute(data: &DecodeData, components: &mut Chip8Components, display: &mut Di
         },
 
         val if val == NibbleCode::Draw as u8 => {
-            draw(components, display, data.register_x, data.register_y, data.constant);
+            draw(components, memory, display, data.register_x, data.register_y, data.constant);
         },
         
         _ => { 
-            panic!("Unknown Opcode");
+            panic!("Unimplemented Opcode");
         }
     }
 }
@@ -177,7 +188,7 @@ fn cpu_step(components: &mut Chip8Components, memory: &mut Memory, display: &mut
     // decode the fetched instruction
     let instruction = decode(instruction_bytes);
     //execute instruction based on decode
-    execute(&instruction, components, display);
+    execute(&instruction, components, memory, display);
 }
 
 // update the frame, including graphics, audio, etc
