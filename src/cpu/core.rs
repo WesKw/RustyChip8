@@ -10,8 +10,9 @@ use crate::cpu::chip8_components::Chip8Components;
 use crate::memory::Memory;
 use crate::launch_arguments::Args;
 use crate::cpu::opcodes::NibbleCode;
+use rand::{Rng, RngExt};
 
-pub struct DecodeData {
+struct DecodeData {
     immediate_mem_address: u16,
     opcode: u8,
     first_byte: u8,
@@ -22,38 +23,75 @@ pub struct DecodeData {
 }
 
 // Clears the screen.
-pub fn clear_screen(display: &mut Display) {
+fn clear_screen(display: &mut Display) {
     // println!("Clearing screen");
     display.clear_buffer();
 }
 
 // Sets the program counter to an address.
-pub fn jump(components: &mut Chip8Components, address: u16) {
+fn jump(components: &mut Chip8Components, address: u16) {
     // println!("Jumping to {:x}", address);
     components.program_counter = address;
 }
 
+// skips one instruction if the value in vx is equal to nn.
+fn branch_eq(components: &mut Chip8Components, x: u8, nn: u8) {
+    let vx_value = components.registers[x as usize];
+    if vx_value == nn {
+        components.program_counter += 2;
+    }
+}
+
+fn branch_ne(components: &mut Chip8Components, x: u8, nn: u8) {
+    let vx_value: u8 = components.registers[x as usize];
+    if vx_value != nn {
+        components.program_counter += 2;
+    }
+}
+
+fn branch_req(components: &mut Chip8Components, x: u8, y: u8) {
+    let vx_value = components.registers[x as usize];
+    let vy_value: u8 = components.registers[y as usize];
+    if vx_value == vy_value {
+        components.program_counter += 2;
+    }
+}
+
 // Set the register X to NN.
-pub fn set_register(components: &mut Chip8Components, register: u8, value: u8) {
+ fn set_register(components: &mut Chip8Components, register: u8, value: u8) {
     // println!("Setting V{:x} to {:x}", register, value);
     components.registers[register as usize] = value;
 }
 
 // Add a value to register X. Does not set the carry flag if the result overflows.
-pub fn add_register(components: &mut Chip8Components, register: u8, value: u8) {
+fn add_register(components: &mut Chip8Components, register: u8, value: u8) {
     // println!("Adding {:x} to V{:x}", value, register);
     components.registers[register as usize] += value;
 }
 
+fn branch_rne(components: &mut Chip8Components, x: u8, y: u8) {
+    let vx_value = components.registers[x as usize];
+    let vy_value: u8 = components.registers[y as usize];
+    if vx_value != vy_value {
+        components.program_counter += 2;
+    }
+}
+
 // Set the index register to an address.
-pub fn set_index_register(components: &mut Chip8Components, address: u16) {
+ fn set_index_register(components: &mut Chip8Components, address: u16) {
     // println!("Set index register to {:x}", address);
     components.index_register = address;
 }
 
+fn random(components: &mut Chip8Components, x: u8, nn: u8) {
+    let mut rng = rand::rng();
+    let value = rng.random::<u8>() & nn;
+    components.registers[x as usize] = value;
+}
+
 // draw a sprite at x and y location from the memory location that the index register
 // points to.
-pub fn draw(components: &mut Chip8Components, memory: &mut Memory, display: &mut Display, x: u8, y: u8, rows: u8) {
+fn draw(components: &mut Chip8Components, memory: &mut Memory, display: &mut Display, x: u8, y: u8, rows: u8) {
     // get x and y coordinates
     let x_loc: u8 = components.registers[x as usize];
     let y_loc: u8 = components.registers[y as usize];
@@ -140,6 +178,7 @@ fn decode(bytes: u16) -> DecodeData {
 fn execute(data: &DecodeData, components: &mut Chip8Components, memory: &mut Memory, display: &mut Display) {
 
     match data.opcode {
+        // 0x0
         val if val == NibbleCode::Misc as u8 => {
             if data.second_byte == 0xE0 {
                 clear_screen(display);
@@ -150,29 +189,84 @@ fn execute(data: &DecodeData, components: &mut Chip8Components, memory: &mut Mem
             }
         },
         
+        // 0x1
         val if val == NibbleCode::Jump as u8 => {
             jump(components, data.immediate_mem_address);
         },
 
+        // 0x2
+        val if val == NibbleCode::Subroutines as u8 => {
+            panic!("Subroutines not implemented {}", val);
+        },
+
+        // 0x3
+        val if val == NibbleCode::BranchEqual as u8 => {
+            branch_eq(components, data.register_x, data.second_byte);
+        },
+
+        // 0x4
+        val if val == NibbleCode::BranchNotEqual as u8 => {
+            branch_ne(components, data.register_x, data.second_byte);
+        },
+
+        // 0x5
+        val if val == NibbleCode::BranchRegisterEqual as u8 => {
+            branch_req(components, data.register_x, data.register_y);
+        },
+
+        // 0x6
         val if val == NibbleCode::SetRegister as u8 => {
             set_register(components, data.register_x, data.second_byte);
-        }
+        },
 
+        // 0x7
         val if val == NibbleCode::AddToRegister as u8 => {
             add_register(components, data.register_x, data.second_byte);
         },
 
+        // 0x8
+        val if val == NibbleCode::Arithmetic as u8 => {
+            panic!("Arithmetic codes not implemented");
+        },
+
+        // 0x9
+        val if val == NibbleCode::BranchRegisterNotEqual as u8 => {
+            branch_rne(components, data.register_x, data.register_y);
+        },
+
+        // 0xA
         val if val == NibbleCode::SetIndexRegister as u8 => {
             set_index_register(components, data.immediate_mem_address);
         },
 
+        // 0xB
+        val if val == NibbleCode::JumpWithOffset as u8 => {
+            panic!("JumpWithOffset not implemented");
+        },
+
+        // 0xC
+        val if val == NibbleCode::Random as u8 => {
+            random(components, data.register_x, data.second_byte);
+        }
+
+        // 0xD
         val if val == NibbleCode::Draw as u8 => {
             draw(components, memory, display, data.register_x, data.register_y, data.constant);
+        },
+
+        // 0xE
+        val if val == NibbleCode::SkipKey as u8 => {
+            panic!("SkipKey not implemented");
+        },
+
+        // 0xF
+        val if val == NibbleCode::Timer as u8 => {
+            panic!("Timer not implemented");
         },
         
         _ => { 
             panic!("Unimplemented Opcode");
-        }
+        },
     }
 }
 
@@ -197,7 +291,7 @@ fn frame_update_step(components: &mut Chip8Components, display: &mut Display) {
 }
 
 // Initialize the CPU.
-pub fn initialize(components: &mut Chip8Components, memory: &mut Memory, display: &mut Display, args: &Args) -> i32 {
+fn initialize(components: &mut Chip8Components, memory: &mut Memory, display: &mut Display, args: &Args) -> i32 {
     // load default components of Chip8
     println!("Initializing Chip8");
 
@@ -225,7 +319,7 @@ pub fn finalize() -> i32 {
 }
 
 // Fetch/decode/execute loop
-pub fn main_loop(components: &mut Chip8Components, memory: &mut Memory, display: &mut Display, fps: u32, ips: u32) -> i32 {
+fn main_loop(components: &mut Chip8Components, memory: &mut Memory, display: &mut Display, fps: u32, ips: u32) -> i32 {
     let update_rate: f64 = 1.0 / fps as f64; // screen refresh rate;
 
     loop {
