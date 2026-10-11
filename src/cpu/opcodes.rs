@@ -27,5 +27,17 @@ pub enum ArithmeticCode {
     SubtractXy = 0x5,
     ShiftRight = 0x6,
     SubtractYx = 0x7,
-    ShiftLeft = 0xE
+    ShiftLeft = 0xE,
+}
+
+pub enum ManipCode {
+    SetVx = 0x07,
+    SetDelay = 0x15,
+    SetSound = 0x18,
+    AddToIndex = 0x1E,
+    GetKey = 0x0A,
+    FontCharacter = 0x29,
+    BinaryDecimalConversion = 0x33,
+    StoreMem = 0x55,
+    LoadMem = 0x65,
 }

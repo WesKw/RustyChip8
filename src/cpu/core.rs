@@ -5,11 +5,13 @@ use std::fs;
 use std::time::{SystemTime, UNIX_EPOCH, Instant};
 use std::thread::sleep;
 
+use crate::cpu::opcodes::NibbleCode::Timer;
 use crate::display::Display;
 use crate::cpu::chip8_components::Chip8Components;
 use crate::memory::Memory;
 use crate::launch_arguments::Args;
-use crate::cpu::opcodes::{ArithmeticCode, NibbleCode};
+use crate::cpu::opcodes::{ArithmeticCode, NibbleCode, ManipCode};
+use actually_beep::beep_with_hz_and_millis;
 use rand::{Rng, RngExt};
 
 struct DecodeData {
@@ -226,6 +228,17 @@ fn draw(components: &mut Chip8Components, memory: &mut Memory, display: &mut Dis
     // display.write_buffer(x_loc as u32, y_loc as u32, value as u32);
 }
 
+fn set_vx_to_delay(components: &mut Chip8Components, vx: u8) {
+    components.registers[vx as usize] = components.delay_timer;
+}
+
+fn set_delay_to_vx(components: &mut Chip8Components, vx: u8) {
+    components.delay_timer = components.registers[vx as usize];
+}
+
+fn set_sound_to_vx(components: &mut Chip8Components, vx: u8) {
+    components.sound_timer = components.registers[vx as usize];
+}
 
 fn fetch(components: &mut Chip8Components, memory: &Memory) -> u16 {
     if components.program_counter as usize >= memory.mem_size() {
@@ -394,7 +407,23 @@ fn execute(data: &DecodeData, components: &mut Chip8Components, memory: &mut Mem
 
         // 0xF
         val if val == NibbleCode::Timer as u8 => {
-            panic!("Timer not implemented");
+            match data.second_byte {
+                val if val == ManipCode::SetVx as u8 => {
+                    set_vx_to_delay(components, data.register_x);
+                },
+
+                val if val == ManipCode::SetDelay as u8 => {
+                    set_delay_to_vx(components, data.register_x);
+                },
+
+                val if val == ManipCode::SetSound as u8 => {
+                    set_sound_to_vx(components, data.register_x);
+                },
+
+                _ => { 
+                    panic!("Unimplemented timer code"); 
+                },
+            }
         },
         
         _ => { 
@@ -416,6 +445,18 @@ fn cpu_step(components: &mut Chip8Components, memory: &mut Memory, display: &mut
     let instruction = decode(instruction_bytes);
     //execute instruction based on decode
     execute(&instruction, components, memory, display);
+}
+
+fn timer_update_step(components: &mut Chip8Components) {
+    if components.delay_timer > 0 {
+        components.delay_timer -= 1;
+    }
+
+    if components.sound_timer > 0 {
+        components.sound_timer -= 1;
+        // make a beeping noise when sound timer is above 0
+        beep_with_hz_and_millis(329, 1000);
+    }
 }
 
 // update the frame, including graphics, audio, etc
@@ -463,6 +504,7 @@ fn main_loop(components: &mut Chip8Components, memory: &mut Memory, display: &mu
             cpu_step(components, memory, display);
         }
 
+        timer_update_step(components);
         frame_update_step(components, display);
 
         // then wait until we need to perform the next update
