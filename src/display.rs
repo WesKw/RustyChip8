@@ -17,14 +17,14 @@ impl Display {
             internal_buffer: vec![false; x as usize * y as usize],
             display_buffer: vec![0; x as usize * y as usize],
             window: Window::new(
-                "Window Test",
+                "Chip8",
                 x as usize,
                 y as usize,
                 WindowOptions {
                     borderless: false,
                     title: true,
                     resize: true,
-                    scale: Scale::X16,
+                    scale: Scale::X8,
                     scale_mode: ScaleMode::AspectRatioStretch,
                     topmost: false,
                     transparency: false,

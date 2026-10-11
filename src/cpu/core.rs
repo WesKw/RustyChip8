@@ -5,7 +5,6 @@ use std::fs;
 use std::time::{SystemTime, UNIX_EPOCH, Instant};
 use std::thread::sleep;
 
-use crate::cpu::opcodes::NibbleCode::Timer;
 use crate::display::Display;
 use crate::cpu::chip8_components::Chip8Components;
 use crate::memory::Memory;
@@ -28,6 +27,20 @@ struct DecodeData {
 fn clear_screen(display: &mut Display) {
     // println!("Clearing screen");
     display.clear_buffer();
+}
+
+fn return_from_subroutine(components: &mut Chip8Components) {
+    components.program_counter = components.stack.pop().unwrap();
+}
+
+// calls the subroutine at address
+fn jump_to_subroutine(components: &mut Chip8Components, address: u16) {
+    if components.stack.len() == 15 {
+        panic!("Stack overflow!");
+    }
+
+    components.stack.push(components.program_counter);
+    components.program_counter = address;
 }
 
 // Sets the program counter to an address.
@@ -240,6 +253,45 @@ fn set_sound_to_vx(components: &mut Chip8Components, vx: u8) {
     components.sound_timer = components.registers[vx as usize];
 }
 
+fn add_to_index(components: &mut Chip8Components, vx: u8) {
+    //  Amiga interpreter relies on setting VF if overflow occurs
+    let next_addr = components.index_register + components.registers[vx as usize] as u16;
+    if next_addr >= 0x1000 {
+        components.registers[0xF as usize] = 1;
+    }
+    components.index_register = next_addr;
+}
+
+// pointer index register to address of the hex char in vx
+fn set_index_to_font_char(components: &mut Chip8Components, vx: u8) {
+    let location: u16 = 5 * components.registers[vx as usize] as u16;
+    components.index_register = 0x050 + location;
+}
+
+// converts a one byte value to 3 decimal digits
+fn binary_to_decimal(components: &mut Chip8Components, memory: &mut Memory, vx: u8) {
+    let mut x = components.registers[vx as usize];    
+    for i in 0..=2 {
+        let remainder = x % 10;
+        x = x / 10;
+        memory.write(components.index_register + 2 - i, remainder);
+    }
+}
+
+fn store_memory(components: &mut Chip8Components, memory: &mut Memory, vx: u8) {
+    // uses newer implementation
+    for i in 0..=vx {
+        memory.write(components.index_register + i as u16, components.registers[i as usize]);
+    }
+}
+
+fn load_memory(components: &mut Chip8Components, memory: &Memory, vx: u8) {
+    // uses newer implementation
+    for i in 0..=vx {
+        components.registers[i as usize] = memory.read(components.index_register + i as u16);
+    }
+}
+
 fn fetch(components: &mut Chip8Components, memory: &Memory) -> u16 {
     if components.program_counter as usize >= memory.mem_size() {
         println!("Hit end of program");
@@ -293,7 +345,7 @@ fn execute(data: &DecodeData, components: &mut Chip8Components, memory: &mut Mem
             }
 
             if data.second_byte == 0xEE {
-                panic!("Subroutines not implemented");
+                return_from_subroutine(components);
             }
         },
         
@@ -304,7 +356,7 @@ fn execute(data: &DecodeData, components: &mut Chip8Components, memory: &mut Mem
 
         // 0x2
         val if val == NibbleCode::Subroutines as u8 => {
-            panic!("Subroutines not implemented {}", val);
+            jump_to_subroutine(components, data.immediate_mem_address);
         },
 
         // 0x3
@@ -420,6 +472,30 @@ fn execute(data: &DecodeData, components: &mut Chip8Components, memory: &mut Mem
                     set_sound_to_vx(components, data.register_x);
                 },
 
+                val if val == ManipCode::AddToIndex as u8 => {
+                    add_to_index(components, data.register_x);
+                },
+
+                val if val == ManipCode::GetKey as u8 => {
+                    panic!("GetKey not implemented!");
+                },
+
+                val if val == ManipCode::FontCharacter as u8 => {
+                    set_index_to_font_char(components, data.register_x);
+                },
+
+                val if val == ManipCode::BinaryDecimalConversion as u8 => {
+                    binary_to_decimal(components, memory, data.register_x);
+                },
+
+                val if val == ManipCode::StoreMem as u8 => {
+                    store_memory(components, memory, data.register_x);
+                },
+
+                val if val == ManipCode::LoadMem as u8 => {
+                    load_memory(components, memory, data.register_x);
+                },
+
                 _ => { 
                     panic!("Unimplemented timer code"); 
                 },
@@ -452,10 +528,11 @@ fn timer_update_step(components: &mut Chip8Components) {
         components.delay_timer -= 1;
     }
 
+    // components.sound_timer = 4;
     if components.sound_timer > 0 {
         components.sound_timer -= 1;
         // make a beeping noise when sound timer is above 0
-        beep_with_hz_and_millis(329, 1000);
+        // beep_with_hz_and_millis(329, 1000);
     }
 }
 
@@ -487,7 +564,7 @@ fn initialize(components: &mut Chip8Components, memory: &mut Memory, display: &m
 }
 
 // shutdown Chip8
-pub fn finalize() -> i32 {
+fn finalize() -> i32 {
     println!("Shutdown");
     0
 }
@@ -513,10 +590,8 @@ fn main_loop(components: &mut Chip8Components, memory: &mut Memory, display: &mu
         sleep(sleep_time);
         // println!("Slept for {:?}", sleep_time);
     }
-
     0
 }
-
 
 pub fn start(args: &Args) -> i32 {
     let mut components = Chip8Components::default();
