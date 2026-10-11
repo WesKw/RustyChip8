@@ -9,7 +9,7 @@ use crate::display::Display;
 use crate::cpu::chip8_components::Chip8Components;
 use crate::memory::Memory;
 use crate::launch_arguments::Args;
-use crate::cpu::opcodes::NibbleCode;
+use crate::cpu::opcodes::{ArithmeticCode, NibbleCode};
 use rand::{Rng, RngExt};
 
 struct DecodeData {
@@ -69,6 +69,94 @@ fn add_register(components: &mut Chip8Components, register: u8, value: u8) {
     components.registers[register as usize] += value;
 }
 
+fn arith_set(components: &mut Chip8Components, x: u8, y: u8) {
+    components.registers[x as usize] = components.registers[y as usize];
+}
+
+fn arith_or(components: &mut Chip8Components, x: u8, y: u8) {
+    let x_value = components.registers[x as usize];
+    let y_value: u8 = components.registers[y as usize];
+    components.registers[x as usize] = x_value | y_value;
+}
+
+fn arith_and(components: &mut Chip8Components, x: u8, y: u8) {
+    let x_value = components.registers[x as usize];
+    let y_value: u8 = components.registers[y as usize];
+    components.registers[x as usize] = x_value & y_value;
+}
+
+fn arith_xor(components: &mut Chip8Components, x: u8, y: u8) {
+    let x_value = components.registers[x as usize];
+    let y_value: u8 = components.registers[y as usize];
+    components.registers[x as usize] = x_value ^ y_value;
+}
+
+fn arith_add(components: &mut Chip8Components, x: u8, y: u8) {
+    let x_value: u8 = components.registers[x as usize];
+    let y_value: u8 = components.registers[y as usize];
+    components.registers[x as usize] = x_value + y_value;
+    components.registers[0xF] = if x_value as u16 + y_value as u16 > 255 { 1 } else { 0 };
+}
+
+fn arith_subtract_xy(components: &mut Chip8Components, x: u8, y: u8) {
+    let x_value: u8 = components.registers[x as usize];
+    let y_value: u8 = components.registers[y as usize];
+    components.registers[x as usize] = x_value - y_value;
+    components.registers[0xF] = if x_value >= y_value { 1 } else { 0 };
+}
+
+fn arith_subtract_yx(components: &mut Chip8Components, x: u8, y: u8) {
+    let x_value: u8 = components.registers[x as usize];
+    let y_value: u8 = components.registers[y as usize];
+    components.registers[x as usize] = y_value - x_value;
+    components.registers[0xF] = if y_value >= x_value { 1 } else { 0 };
+}
+
+fn arith_shift_right(components: &mut Chip8Components, vx: u8, vy: u8) {
+    // todo:: add flag for newer chip8 implementations
+    let x: u8 = components.registers[vx as usize];
+    let y: u8 = components.registers[vy as usize];
+    let mut shifted_out: u8 = 0;
+
+    // original behavior (vy moves into vx)
+    if true {
+        shifted_out = y & 0x1;
+        components.registers[vx as usize] = y >> 1;
+    }
+
+    // todo:: new behavior (shift in-place and ignore vy)
+    if false {
+        shifted_out = x & 0x1;
+        components.registers[vx as usize] = x >> 1;
+    }
+    
+    // set flag register
+    components.registers[0xF as usize] = shifted_out;
+}
+
+fn arith_shift_left(components: &mut Chip8Components, vx: u8, vy: u8) {
+    // todo:: add flag for newer chip8 implementations
+    // todo:: add flag for newer chip8 implementations
+    let x: u8 = components.registers[vx as usize];
+    let y: u8 = components.registers[vy as usize];
+    let mut shifted_out: u8 = 0;
+
+    // original behavior (vy moves into vx)
+    if true {
+        shifted_out = y & 0x40;
+        components.registers[vx as usize] = y << 1;
+    }
+
+    // todo:: new behavior (shift in-place and ignore vy)
+    if false {
+        shifted_out = x & 0x40;
+        components.registers[vx as usize] = x << 1;
+    }
+    
+    // set flag register
+    components.registers[0xF as usize] = shifted_out;
+}
+
 fn branch_rne(components: &mut Chip8Components, x: u8, y: u8) {
     let vx_value = components.registers[x as usize];
     let vy_value: u8 = components.registers[y as usize];
@@ -78,9 +166,16 @@ fn branch_rne(components: &mut Chip8Components, x: u8, y: u8) {
 }
 
 // Set the index register to an address.
- fn set_index_register(components: &mut Chip8Components, address: u16) {
+fn set_index_register(components: &mut Chip8Components, address: u16) {
     // println!("Set index register to {:x}", address);
     components.index_register = address;
+}
+
+// jump to address plus value in register
+fn jump_with_offset(components: &mut Chip8Components, vx: u8, address: u16) {
+    // todo:: new behavior jumps to XNN with offset of VX, old uses V0
+    let offset: u8 = if true { components.registers[0x0 as usize] } else { components.registers[vx as usize] };
+    components.program_counter = address + offset as u16;
 }
 
 fn random(components: &mut Chip8Components, x: u8, nn: u8) {
@@ -226,7 +321,45 @@ fn execute(data: &DecodeData, components: &mut Chip8Components, memory: &mut Mem
 
         // 0x8
         val if val == NibbleCode::Arithmetic as u8 => {
-            panic!("Arithmetic codes not implemented");
+            match data.constant {
+                val if val == ArithmeticCode::Set as u8 => {
+                    arith_set(components, data.register_x, data.register_y);
+                },
+
+                val if val == ArithmeticCode::Or as u8 => {
+                    arith_or(components, data.register_x, data.register_y);
+                },
+
+                val if val == ArithmeticCode::And as u8 => {
+                    arith_and(components, data.register_x, data.register_y);
+                },
+
+                val if val == ArithmeticCode::Xor as u8 => {
+                    arith_xor(components, data.register_x, data.register_y);
+                },
+
+                val if val == ArithmeticCode::Add as u8 => {
+                    arith_add(components, data.register_x, data.register_y);
+                },
+
+                val if val == ArithmeticCode::SubtractXy as u8 => {
+                    arith_subtract_xy(components, data.register_x, data.register_y);
+                },
+
+                val if val == ArithmeticCode::SubtractYx as u8 => {
+                    arith_subtract_yx(components, data.register_x, data.register_y);
+                },
+
+                val if val == ArithmeticCode::ShiftRight as u8 => {
+                    arith_shift_right(components, data.register_x, data.register_y);
+                },
+
+                val if val == ArithmeticCode::ShiftLeft as u8 => {
+                    arith_shift_left(components, data.register_x, data.register_y);
+                },
+
+                _ => { panic!("Unimplemented arithmetic instruction"); }
+            }
         },
 
         // 0x9
@@ -241,7 +374,7 @@ fn execute(data: &DecodeData, components: &mut Chip8Components, memory: &mut Mem
 
         // 0xB
         val if val == NibbleCode::JumpWithOffset as u8 => {
-            panic!("JumpWithOffset not implemented");
+            jump_with_offset(components, data.register_x, data.immediate_mem_address);
         },
 
         // 0xC

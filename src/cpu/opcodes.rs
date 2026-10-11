@@ -18,6 +18,14 @@ pub enum NibbleCode {
     Timer = 0xF,
 }
 
-pub enum MiscCodes {
-
+pub enum ArithmeticCode {
+    Set = 0x0,
+    Or = 0x1,
+    And = 0x2,
+    Xor = 0x3,
+    Add = 0x4,
+    SubtractXy = 0x5,
+    ShiftRight = 0x6,
+    SubtractYx = 0x7,
+    ShiftLeft = 0xE
 }
