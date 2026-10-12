@@ -528,11 +528,10 @@ fn timer_update_step(components: &mut Chip8Components) {
         components.delay_timer -= 1;
     }
 
-    // components.sound_timer = 4;
     if components.sound_timer > 0 {
         components.sound_timer -= 1;
         // make a beeping noise when sound timer is above 0
-        // beep_with_hz_and_millis(329, 1000);
+        beep_with_hz_and_millis(329, 1000);
     }
 }
 
