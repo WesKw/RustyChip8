@@ -1,0 +1,63 @@
+#[derive(Debug, Clone)]
+pub struct Memory {
+    data: Vec<u8> // memory block
+}
+
+impl Memory {
+    pub fn new(size: u16) -> Self {
+        Self {
+            data: vec![0; size as usize]
+        }
+    }
+
+    pub fn setup_font_data(&mut self) {
+        let font_start: usize = 0x050;
+        let font_end: usize = 0x09F;
+
+        // insert font data into memory
+        let font = [ 
+            0xF0, 0x90, 0x90, 0x90, 0xF0, // 0
+            0x20, 0x60, 0x20, 0x20, 0x70, // 1
+            0xF0, 0x10, 0xF0, 0x80, 0xF0, // 2
+            0xF0, 0x10, 0xF0, 0x10, 0xF0, // 3
+            0x90, 0x90, 0xF0, 0x10, 0x10, // 4
+            0xF0, 0x80, 0xF0, 0x10, 0xF0, // 5
+            0xF0, 0x80, 0xF0, 0x90, 0xF0, // 6
+            0xF0, 0x10, 0x20, 0x40, 0x40, // 7
+            0xF0, 0x90, 0xF0, 0x90, 0xF0, // 8
+            0xF0, 0x90, 0xF0, 0x10, 0xF0, // 9
+            0xF0, 0x90, 0xF0, 0x90, 0x90, // A
+            0xE0, 0x90, 0xE0, 0x90, 0xE0, // B
+            0xF0, 0x80, 0x80, 0x80, 0xF0, // C
+            0xE0, 0x90, 0x90, 0x90, 0xE0, // D
+            0xF0, 0x80, 0xF0, 0x80, 0xF0, // E
+            0xF0, 0x80, 0xF0, 0x80, 0x80,  // F
+        ];
+
+        for i in font_start..=font_end {
+            self.data[i as usize] = font[i-font_start as usize]
+        }
+
+
+    }
+
+    pub fn mem_size(&self) -> usize {
+        self.data.len()
+    }
+
+    pub fn read(&self, address: u16) -> u8 {
+        if address as usize >= self.data.len() {
+            panic!("Invalid memory access for read: 0x{:x}", address);
+        }
+
+        self.data[address as usize]
+    }
+
+    pub fn write(&mut self, address: u16, value: u8) {
+        if address as usize >= self.data.len() {
+            panic!("Invalid memory access for write: 0x{:x}", address);
+        }
+        
+        self.data[address as usize] = value
+    }
+}
